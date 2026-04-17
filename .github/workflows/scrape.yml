@@ -1,0 +1,46 @@
+name: 每日爬取黃金新聞
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 檢出代碼
+        uses: actions/checkout@v4
+
+      - name: 設置 Python 環境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 安裝依賴庫
+        run: pip install -r requirements.txt
+
+      - name: 運行黃金新聞爬蟲
+        run: python scraper.py --batches 5 --output gold_news.csv
+
+      - name: 上傳 CSV 結果為 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-news-${{ github.run_number }}-${{ github.run_attempt }}
+          path: gold_news.csv
+          retention-days: 30
+
+      - name: 顯示爬取結果統計
+        run: |
+          if [ -f gold_news.csv ]; then
+            echo "===== 爬取完成 ====="
+            echo "總行數（含標題行）：$(wc -l < gold_news.csv)"
+            echo "新聞條數：$(($(wc -l < gold_news.csv) - 1))"
+            echo ""
+            echo "===== 前 5 條預覽 ====="
+            head -6 gold_news.csv
+          else
+            echo "警告：未找到輸出文件"
+          fi
