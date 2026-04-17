@@ -20,27 +20,38 @@ jobs:
           cache: 'pip'
 
       - name: 安裝依賴庫
-        run: pip install -r requirements.txt
+        run: pip install requests beautifulsoup4 lxml
 
       - name: 運行黃金新聞爬蟲
         run: python scraper.py --batches 5 --output gold_news.csv
 
-      - name: 上傳 CSV 結果為 Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: gold-news-${{ github.run_number }}-${{ github.run_attempt }}
-          path: gold_news.csv
-          retention-days: 30
-
       - name: 顯示爬取結果統計
         run: |
           if [ -f gold_news.csv ]; then
+            COUNT=$(($(wc -l < gold_news.csv) - 1))
             echo "===== 爬取完成 ====="
-            echo "總行數（含標題行）：$(wc -l < gold_news.csv)"
-            echo "新聞條數：$(($(wc -l < gold_news.csv) - 1))"
+            echo "共找到黃金新聞：$COUNT 條"
             echo ""
-            echo "===== 前 5 條預覽 ====="
+            echo "===== 最新 5 條預覽 ====="
             head -6 gold_news.csv
           else
             echo "警告：未找到輸出文件"
+            exit 1
           fi
+
+      - name: 上傳 CSV 為 Artifact（可在 Actions 頁面下載）
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-news-${{ github.run_number }}
+          path: gold_news.csv
+          retention-days: 30
+
+      - name: 將結果提交回倉庫
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add gold_news.csv
+          git diff --staged --quiet || git commit -m "自動更新：黃金新聞 $(date '+%Y-%m-%d')"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
